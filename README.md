@@ -1,4 +1,4 @@
-# Example2
+# Example 2
 ### Purpose
 Understand the sensors of smart phone. 
 ### Operation
