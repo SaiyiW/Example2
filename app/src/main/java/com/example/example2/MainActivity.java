@@ -10,10 +10,22 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.os.Environment;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.sql.Time;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 
 /**
  * Smart Phone Sensing Example 2 - 2017. Working with sensors.
@@ -54,7 +66,14 @@ public class MainActivity extends Activity implements SensorEventListener {
      */
     private TextView currentX, currentY, currentZ, titleAcc, textRssi;
 
+    private boolean record;
+
+    private File LogFile;
+    private BufferedWriter buf;
+
     Button buttonRssi;
+    Button buttonStartWrite;
+    Button buttonStopWrite;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -68,8 +87,12 @@ public class MainActivity extends Activity implements SensorEventListener {
         titleAcc = (TextView) findViewById(R.id.titleAcc);
         textRssi = (TextView) findViewById(R.id.textRSSI);
 
+        record=false;
+
         // Create the button
         buttonRssi = (Button) findViewById(R.id.buttonRSSI);
+        buttonStartWrite=(Button) findViewById(R.id.buttonStartToWrite);
+        buttonStopWrite=(Button) findViewById(R.id.buttonStopWriting);
 
         // Set the sensor manager
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -90,6 +113,16 @@ public class MainActivity extends Activity implements SensorEventListener {
         // Set the wifi manager
         wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
 
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        LogFile = new File(downloads, "sensorLogs.txt");
+        if(!LogFile.exists()){
+            try {
+                LogFile.createNewFile();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
         // Create a click listener for our button.
         buttonRssi.setOnClickListener(new OnClickListener() {
             @Override
@@ -100,6 +133,48 @@ public class MainActivity extends Activity implements SensorEventListener {
                 textRssi.setText("\n\tSSID = " + wifiInfo.getSSID()
                         + "\n\tRSSI = " + wifiInfo.getRssi()
                         + "\n\tLocal Time = " + System.currentTimeMillis());
+            }
+        });
+
+        buttonStartWrite.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(isExternalStorageWritable()) {  //check if the external storage is available
+                    record = true;
+                    try {
+                        buf= new BufferedWriter(new FileWriter(LogFile,true));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+
+        buttonStopWrite.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                record=false;
+                String localTime;
+
+                //get the local time
+                Calendar calendar=Calendar.getInstance();
+                int year  =calendar.get(Calendar.YEAR);
+                int month =calendar.get(Calendar.MONTH);
+                int day   =calendar.get(Calendar.DATE);
+                int hour  =calendar.get(Calendar.HOUR);
+                int minute=calendar.get(Calendar.MINUTE);
+                int second=calendar.get(Calendar.SECOND);
+                localTime="====="+Integer.toString(year)+"-"+Integer.toString(month)+"-"+Integer.toString(day)+"-"+
+                        Integer.toString(hour)+":"+Integer.toString(minute)+":"+Integer.toString(second)+"=====";
+
+                try {
+                    buf.newLine();
+                    buf.append(localTime);
+                    buf.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         });
     }
@@ -120,6 +195,15 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
         // Do nothing.
+    }
+
+    /* Checks if external storage is available for read and write */
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -146,6 +230,17 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
         if ((Math.abs(aZ) > Math.abs(aY)) && (Math.abs(aZ) > Math.abs(aX))) {
             titleAcc.setTextColor(Color.GREEN);
+        }
+
+        //write to file
+        if(record){
+            String accWriteData="!"+Float.toString(aX)+","+Float.toString(aY)+","+Float.toString(aZ)+"!";
+            try {
+                buf.newLine();
+                buf.append(accWriteData);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
